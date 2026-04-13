@@ -18,11 +18,12 @@ interface FileItem {
   selected?: boolean;
 }
 
-// Force refresh v36
+// Force refresh v38
 export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
   const [showInstallInfo, setShowInstallInfo] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   
   const [noteStyle, setNoteStyle] = useState<'plain' | 'lines' | 'dotted'>(() => {
     const saved = localStorage.getItem('wide-pdf-style');
@@ -74,9 +75,8 @@ export default function App() {
 
   const appUrl = 'https://ais-pre-diab65pvbfs5jsscymrwoi-231575235684.europe-west2.run.app';
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || []) as File[];
-    const pdfFiles = selectedFiles.filter(f => f.type === 'application/pdf');
+  const addFilesToProcess = useCallback((newFiles: File[]) => {
+    const pdfFiles = newFiles.filter(f => f.type === 'application/pdf');
     
     if (pdfFiles.length > 0) {
       const newFileItems: FileItem[] = pdfFiles.map(f => ({
@@ -85,10 +85,43 @@ export default function App() {
         status: 'pending'
       }));
       setFiles(prev => [...prev, ...newFileItems]);
-      // Start generation immediately for new files
       generateAll(noteStyle, spacing, widthMultiplier, newFileItems);
     }
+  }, [noteStyle, spacing, widthMultiplier]);
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || []) as File[];
+    addFilesToProcess(selectedFiles);
   };
+
+  // Handle URL Import
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const importId = params.get('id');
+
+    if (importId) {
+      const fetchFile = async () => {
+        try {
+          const response = await fetch(`/api/file?id=${importId}`);
+          if (!response.ok) throw new Error('Datei konnte nicht geladen werden oder ist abgelaufen.');
+          
+          const blob = await response.blob();
+          const fileName = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'imported.pdf';
+          const file = new File([blob], fileName, { type: 'application/pdf' });
+          
+          addFilesToProcess([file]);
+          
+          // Remove ID from URL
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, '', newUrl);
+        } catch (err) {
+          console.error('Import failed:', err);
+          setImportError(err instanceof Error ? err.message : 'Import fehlgeschlagen');
+        }
+      };
+      fetchFile();
+    }
+  }, [addFilesToProcess]);
 
   const processFile = async (fileItem: FileItem, style: 'plain' | 'lines' | 'dotted', currentSpacing: number, currentMultiplier: number) => {
     setFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'processing', error: undefined } : f));
@@ -262,6 +295,19 @@ export default function App() {
           </header>
 
           <div className="space-y-8">
+            {importError && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 text-red-700 dark:text-red-400 px-4 py-3 rounded-xl flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-3">
+                  <AlertCircle size={20} />
+                  <span className="text-sm font-medium">{importError}</span>
+                </div>
+                <button onClick={() => setImportError(null)} className="text-xs font-bold hover:underline">Schließen</button>
+              </motion.div>
+            )}
             <div className="relative group">
               <input
                 type="file"
