@@ -27,6 +27,7 @@ export default async function handler(req: Request) {
         'Authorization': `Bearer ${token}`,
         'x-api-version': '7',
         'content-type': contentType,
+        'x-access': 'private',
       },
     });
 
