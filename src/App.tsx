@@ -18,7 +18,7 @@ interface FileItem {
   selected?: boolean;
 }
 
-// Force refresh v42
+// Force refresh v43
 export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
@@ -106,7 +106,17 @@ export default function App() {
           if (!response.ok) throw new Error('Datei konnte nicht geladen werden oder ist abgelaufen.');
           
           const blob = await response.blob();
-          const fileName = response.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g, '') || 'imported.pdf';
+          
+          // Extract filename from Content-Disposition header
+          let fileName = 'imported.pdf';
+          const disposition = response.headers.get('Content-Disposition');
+          if (disposition && disposition.includes('filename=')) {
+            const filenameMatch = disposition.match(/filename="?([^";]+)"?/);
+            if (filenameMatch && filenameMatch[1]) {
+              fileName = filenameMatch[1];
+            }
+          }
+          
           const file = new File([blob], fileName, { type: 'application/pdf' });
           
           addFilesToProcess([file]);

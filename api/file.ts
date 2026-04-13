@@ -23,8 +23,12 @@ export default async function handler(req: any, res: any) {
 
     const buffer = await response.arrayBuffer();
     const contentType = response.headers.get('content-type') || 'application/pdf';
+    const contentDisposition = response.headers.get('content-disposition');
 
     res.setHeader('Content-Type', contentType);
+    if (contentDisposition) {
+      res.setHeader('Content-Disposition', contentDisposition);
+    }
     res.send(Buffer.from(buffer));
   } catch (error) {
     console.error('File retrieval error:', error);
