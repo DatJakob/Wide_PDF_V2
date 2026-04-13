@@ -1,3 +1,13 @@
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getStorage, ref, getBytes, getMetadata } from 'firebase/storage';
+import firebaseConfig from '../firebase-applet-config.json';
+
+// Initialize Firebase Client SDK
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const storage = getStorage(app);
+
 export default async function handler(req: any, res: any) {
   const id = req.query.id as string;
   
@@ -6,32 +16,28 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Decode the URL from the ID (using Buffer for Node.js robustness)
-    const fileUrl = Buffer.from(id, 'base64').toString('utf-8');
+    // Get metadata from Firestore using Client SDK
+    const docRef = doc(db, 'imports', id);
+    const docSnap = await getDoc(docRef);
     
-    // Fetch the private blob using the administrative token
-    const response = await fetch(fileUrl, {
-      headers: {
-        'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
-      }
-    });
-
-    if (!response.ok) {
-      console.error(`Fetch failed with status: ${response.status}`);
-      throw new Error('File not found or access denied');
+    if (!docSnap.exists()) {
+      return res.status(404).json({ error: 'File not found' });
     }
 
-    const buffer = await response.arrayBuffer();
-    const contentType = response.headers.get('content-type') || 'application/pdf';
-    const contentDisposition = response.headers.get('content-disposition');
+    const data = docSnap.data();
+    const fileRef = ref(storage, data?.storagePath);
 
-    res.setHeader('Content-Type', contentType);
-    if (contentDisposition) {
-      res.setHeader('Content-Disposition', contentDisposition);
-    }
-    res.send(Buffer.from(buffer));
+    // Download file and metadata using Client SDK
+    const [metadata, content] = await Promise.all([
+      getMetadata(fileRef),
+      getBytes(fileRef)
+    ]);
+
+    res.setHeader('Content-Type', metadata.contentType || 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${data?.fileName}"`);
+    res.send(Buffer.from(content));
   } catch (error) {
     console.error('File retrieval error:', error);
-    res.status(404).json({ error: 'File not found or expired' });
+    res.status(500).json({ error: 'Internal server error' });
   }
 }

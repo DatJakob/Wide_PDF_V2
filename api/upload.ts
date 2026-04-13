@@ -1,5 +1,13 @@
-import { put } from '@vercel/blob';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
+import firebaseConfig from '../firebase-applet-config.json';
+
+// Initialize Firebase Client SDK
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const storage = getStorage(app);
 
 export const config = {
   api: {
@@ -7,34 +15,49 @@ export const config = {
   },
 };
 
+// Helper to convert stream to buffer
+async function streamToBuffer(stream: any): Promise<Buffer> {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Note: In Vercel Serverless, we'd typically use a library like 'formidable' 
-    // to parse multipart/form-data. For this example, we assume the file is sent 
-    // as a raw body or we use a simpler approach.
-    // To keep it robust for Vercel, we'll use the request directly if it's a stream.
-    
     const filename = (req.headers['x-filename'] as string) || 'document.pdf';
     const contentType = req.headers['content-type'] || 'application/pdf';
     
-    const blob = await put(filename, req, {
-      access: 'private',
-      addRandomSuffix: false,
+    const fileId = uuidv4();
+    const storagePath = `imports/${fileId}/${filename}`;
+    const storageRef = ref(storage);
+    const fileRef = ref(storage, storagePath);
+
+    // Read the stream into a buffer
+    const buffer = await streamToBuffer(req);
+
+    // Upload to Firebase Storage using Client SDK
+    await uploadBytes(fileRef, buffer, {
       contentType: contentType,
     });
 
-    // Use the preferred custom domain for the generated link
+    // Store metadata in Firestore using Client SDK
+    await setDoc(doc(db, 'imports', fileId), {
+      fileName: filename,
+      storagePath: storagePath,
+      createdAt: new Date().toISOString()
+    });
+
     const baseUrl = 'https://wide-pdf.vercel.app';
-    const encodedId = Buffer.from(blob.url).toString('base64');
     
     res.json({ 
-      id: encodedId, 
-      url: `${baseUrl}/import?id=${encodedId}`,
-      expiresIn: 'Depends on Vercel Blob settings'
+      id: fileId, 
+      url: `${baseUrl}/import?id=${fileId}`,
     });
   } catch (error) {
     console.error('Upload error:', error);

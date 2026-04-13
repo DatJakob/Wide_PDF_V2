@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /imports/{importId} {
+      // Allow read if you have the ID (the link)
+      // In a real app, we might want to restrict this, but for the "no login" requirement:
+      allow read: if true;
+      // Writing is handled by the server-side API
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
