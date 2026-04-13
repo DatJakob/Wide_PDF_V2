@@ -22,15 +22,16 @@ export default async function handler(req: any, res: any) {
     const contentType = req.headers['content-type'] || 'application/pdf';
     
     const blob = await put(filename, req, {
-      access: 'public',
+      access: 'private',
       addRandomSuffix: true,
       contentType: contentType,
     });
 
     // We use the blob URL as the ID or store the mapping
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://wide-pdf.vercel.app';
     res.json({ 
       id: btoa(blob.url), // Simple encoding of the URL as an ID
-      url: `/import?id=${btoa(blob.url)}`,
+      url: `${baseUrl}/import?id=${btoa(blob.url)}`,
       expiresIn: 'Depends on Vercel Blob settings'
     });
   } catch (error) {
