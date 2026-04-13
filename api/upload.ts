@@ -1,43 +1,44 @@
 import { put } from '@vercel/blob';
-import { v4 as uuidv4 } from 'uuid';
 
 export const config = {
-  api: {
-    bodyParser: false,
-  },
+  runtime: 'edge',
 };
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: Request) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { 
+      status: 405,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 
   try {
-    // Note: In Vercel Serverless, we'd typically use a library like 'formidable' 
-    // to parse multipart/form-data. For this example, we assume the file is sent 
-    // as a raw body or we use a simpler approach.
-    // To keep it robust for Vercel, we'll use the request directly if it's a stream.
+    const filename = req.headers.get('x-filename') || 'document.pdf';
+    const contentType = req.headers.get('content-type') || 'application/pdf';
     
-    const filename = req.headers['x-filename'] || 'document.pdf';
-    const contentType = req.headers['content-type'] || 'application/pdf';
-    
-    const blob = await put(filename, req, {
+    // Edge functions can stream the request body directly to Vercel Blob
+    const blob = await put(filename, req.body!, {
       access: 'private',
-      addRandomSuffix: true,
+      addRandomSuffix: false,
       contentType: contentType,
     });
 
-    // Use the preferred custom domain for the generated link
     const baseUrl = 'https://wide-pdf.vercel.app';
-    const encodedId = Buffer.from(blob.url).toString('base64');
+    const encodedId = btoa(blob.url);
     
-    res.json({ 
+    return new Response(JSON.stringify({ 
       id: encodedId, 
       url: `${baseUrl}/import?id=${encodedId}`,
       expiresIn: 'Depends on Vercel Blob settings'
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: 'Upload failed' });
+    return new Response(JSON.stringify({ error: 'Upload failed' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
