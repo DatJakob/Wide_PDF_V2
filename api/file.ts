@@ -6,10 +6,20 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const fileUrl = atob(id); // Decode the URL from the ID
+    // Decode the URL from the ID (using Buffer for Node.js robustness)
+    const fileUrl = Buffer.from(id, 'base64').toString('utf-8');
     
-    const response = await fetch(fileUrl);
-    if (!response.ok) throw new Error('File not found');
+    // Fetch the private blob using the administrative token
+    const response = await fetch(fileUrl, {
+      headers: {
+        'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Fetch failed with status: ${response.status}`);
+      throw new Error('File not found or access denied');
+    }
 
     const buffer = await response.arrayBuffer();
     const contentType = response.headers.get('content-type') || 'application/pdf';
