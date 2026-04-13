@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wide-pdf-v50';
+const CACHE_NAME = 'wide-pdf-v51';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
