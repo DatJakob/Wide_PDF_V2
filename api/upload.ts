@@ -10,7 +10,8 @@ const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 if (!admin.apps.length) {
   admin.initializeApp({
     projectId: firebaseConfig.projectId,
-    storageBucket: firebaseConfig.storageBucket
+    // Try the .appspot.com suffix which is the most common default
+    storageBucket: `${firebaseConfig.projectId}.appspot.com`
   });
 }
 
