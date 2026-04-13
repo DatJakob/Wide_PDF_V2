@@ -18,7 +18,7 @@ interface FileItem {
   selected?: boolean;
 }
 
-// Force refresh v47
+// Force refresh v48
 export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isProcessingAll, setIsProcessingAll] = useState(false);

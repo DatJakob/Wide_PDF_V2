@@ -1,33 +1,27 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes } from 'firebase/storage';
+import * as admin from 'firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
 
-// Load Firebase config manually to avoid ESM import issues
+// Load Firebase config manually
 const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
-// Initialize Firebase Client SDK
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-const storage = getStorage(app);
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: firebaseConfig.projectId,
+    storageBucket: firebaseConfig.storageBucket
+  });
+}
+
+const db = admin.firestore();
+const bucket = admin.storage().bucket();
 
 export const config = {
   api: {
     bodyParser: false,
   },
 };
-
-// Helper to convert stream to buffer
-async function streamToBuffer(stream: any): Promise<Buffer> {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-  }
-  return Buffer.concat(chunks);
-}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -40,19 +34,23 @@ export default async function handler(req: any, res: any) {
     
     const fileId = uuidv4();
     const storagePath = `imports/${fileId}/${filename}`;
-    const storageRef = ref(storage);
-    const fileRef = ref(storage, storagePath);
+    const file = bucket.file(storagePath);
 
-    // Read the stream into a buffer
-    const buffer = await streamToBuffer(req);
-
-    // Upload to Firebase Storage using Client SDK
-    await uploadBytes(fileRef, buffer, {
-      contentType: contentType,
+    // Stream the request body to Firebase Storage using Admin SDK
+    await new Promise((resolve, reject) => {
+      const stream = file.createWriteStream({
+        metadata: {
+          contentType: contentType,
+        },
+        resumable: false // Better for small files in serverless
+      });
+      req.pipe(stream)
+        .on('error', reject)
+        .on('finish', resolve);
     });
 
-    // Store metadata in Firestore using Client SDK
-    await setDoc(doc(db, 'imports', fileId), {
+    // Store metadata in Firestore using Admin SDK
+    await db.collection('imports').doc(fileId).set({
       fileName: filename,
       storagePath: storagePath,
       createdAt: new Date().toISOString()
@@ -66,6 +64,6 @@ export default async function handler(req: any, res: any) {
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: 'Upload failed' });
+    res.status(500).json({ error: 'Upload failed', details: error instanceof Error ? error.message : String(error) });
   }
 }
