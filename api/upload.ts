@@ -1,4 +1,6 @@
-import admin from 'firebase-admin';
+import { put } from '@vercel/blob';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
@@ -6,6 +8,10 @@ import path from 'path';
 // Load Firebase config manually
 const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+
+// Initialize Firebase Client SDK for metadata
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export const config = {
   api: {
@@ -18,64 +24,34 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const bucketsToTry = [
-    firebaseConfig.storageBucket,
-    `${firebaseConfig.projectId}.appspot.com`,
-    firebaseConfig.projectId
-  ];
+  try {
+    const filename = (req.headers['x-filename'] as string) || 'document.pdf';
+    const contentType = req.headers['content-type'] || 'application/pdf';
+    const fileId = uuidv4();
 
-  let lastError = null;
+    // Upload to Vercel Blob (Fixing the "already exists" error)
+    const blob = await put(`imports/${fileId}/${filename}`, req, {
+      access: 'public',
+      contentType: contentType,
+      addRandomSuffix: true, // This prevents the "already exists" error
+    });
 
-  for (const bucketName of bucketsToTry) {
-    try {
-      // Clear existing apps to re-initialize with new bucket if needed
-      if (admin.apps.length) {
-        await Promise.all(admin.apps.map(app => app?.delete()));
-      }
+    // Store metadata in Firestore
+    await setDoc(doc(db, 'imports', fileId), {
+      fileName: filename,
+      blobUrl: blob.url,
+      createdAt: new Date().toISOString()
+    });
 
-      admin.initializeApp({
-        projectId: firebaseConfig.projectId,
-        storageBucket: bucketName
-      });
-
-      const db = admin.firestore();
-      const bucket = admin.storage().bucket(bucketName);
-
-      const filename = (req.headers['x-filename'] as string) || 'document.pdf';
-      const contentType = req.headers['content-type'] || 'application/pdf';
-      const fileId = uuidv4();
-      const storagePath = `imports/${fileId}/${filename}`;
-      const file = bucket.file(storagePath);
-
-      await new Promise((resolve, reject) => {
-        const stream = file.createWriteStream({
-          metadata: { contentType },
-          resumable: false
-        });
-        req.pipe(stream).on('error', reject).on('finish', resolve);
-      });
-
-      await db.collection('imports').doc(fileId).set({
-        fileName: filename,
-        storagePath: storagePath,
-        createdAt: new Date().toISOString()
-      });
-
-      return res.json({ 
-        id: fileId, 
-        url: `https://wide-pdf.vercel.app/import?id=${fileId}`,
-        bucketUsed: bucketName
-      });
-    } catch (error) {
-      console.error(`Failed with bucket ${bucketName}:`, error);
-      lastError = error;
-      // Continue to next bucket
-    }
+    res.json({ 
+      id: fileId, 
+      url: `https://wide-pdf.vercel.app/import?id=${fileId}`,
+    });
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ 
+      error: 'Upload failed', 
+      details: error instanceof Error ? error.message : String(error)
+    });
   }
-
-  res.status(500).json({ 
-    error: 'Upload failed after trying all buckets', 
-    details: lastError instanceof Error ? lastError.message : String(lastError),
-    bucketsTried: bucketsToTry
-  });
 }
