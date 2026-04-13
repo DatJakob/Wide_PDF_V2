@@ -18,7 +18,7 @@ interface FileItem {
   selected?: boolean;
 }
 
-// Force refresh v38
+// Force refresh v39
 export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
@@ -73,7 +73,7 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  const appUrl = 'https://ais-pre-diab65pvbfs5jsscymrwoi-231575235684.europe-west2.run.app';
+  const appUrl = 'https://wide-pdf.vercel.app';
 
   const addFilesToProcess = useCallback((newFiles: File[]) => {
     const pdfFiles = newFiles.filter(f => f.type === 'application/pdf');
