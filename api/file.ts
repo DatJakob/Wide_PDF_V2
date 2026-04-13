@@ -1,4 +1,6 @@
-import admin from 'firebase-admin';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, getDoc } from 'firebase/firestore';
+import { getStorage, ref, getBytes, getMetadata } from 'firebase/storage';
 import fs from 'fs';
 import path from 'path';
 
@@ -6,15 +8,10 @@ import path from 'path';
 const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: firebaseConfig.projectId,
-    storageBucket: firebaseConfig.storageBucket
-  });
-}
-
-const db = admin.firestore();
-const bucket = admin.storage().bucket(firebaseConfig.storageBucket);
+// Initialize Firebase Client SDK
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const storage = getStorage(app);
 
 export default async function handler(req: any, res: any) {
   const id = req.query.id as string;
@@ -24,29 +21,31 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Get metadata from Firestore using Admin SDK
-    const doc = await db.collection('imports').doc(id).get();
+    // Get metadata from Firestore
+    const docRef = doc(db, 'imports', id);
+    const docSnap = await getDoc(docRef);
     
-    if (!doc.exists) {
+    if (!docSnap.exists()) {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    const data = doc.data();
-    const file = bucket.file(data?.storagePath);
+    const data = docSnap.data();
+    const fileRef = ref(storage, data?.storagePath);
 
-    const [exists] = await file.exists();
-    if (!exists) {
-      return res.status(404).json({ error: 'File not found in storage' });
-    }
-
-    const [metadata] = await file.getMetadata();
-    const [content] = await file.download();
+    // Download using Client SDK
+    const [metadata, content] = await Promise.all([
+      getMetadata(fileRef),
+      getBytes(fileRef)
+    ]);
 
     res.setHeader('Content-Type', metadata.contentType || 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${data?.fileName}"`);
-    res.send(content);
+    res.send(Buffer.from(content));
   } catch (error) {
     console.error('File retrieval error:', error);
-    res.status(500).json({ error: 'Internal server error', details: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
   }
 }

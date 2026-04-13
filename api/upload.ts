@@ -1,4 +1,6 @@
-import admin from 'firebase-admin';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
@@ -7,21 +9,24 @@ import path from 'path';
 const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: firebaseConfig.projectId,
-    storageBucket: firebaseConfig.storageBucket
-  });
-}
-
-const db = admin.firestore();
-const bucket = admin.storage().bucket(firebaseConfig.storageBucket);
+// Initialize Firebase Client SDK
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const storage = getStorage(app);
 
 export const config = {
   api: {
     bodyParser: false,
   },
 };
+
+async function streamToBuffer(stream: any): Promise<Buffer> {
+  const chunks = [];
+  for await (const chunk of stream) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks);
+}
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
@@ -34,23 +39,18 @@ export default async function handler(req: any, res: any) {
     
     const fileId = uuidv4();
     const storagePath = `imports/${fileId}/${filename}`;
-    const file = bucket.file(storagePath);
+    const fileRef = ref(storage, storagePath);
 
-    // Stream the request body to Firebase Storage using Admin SDK
-    await new Promise((resolve, reject) => {
-      const stream = file.createWriteStream({
-        metadata: {
-          contentType: contentType,
-        },
-        resumable: false // Better for small files in serverless
-      });
-      req.pipe(stream)
-        .on('error', reject)
-        .on('finish', resolve);
+    // Read the stream into a buffer
+    const buffer = await streamToBuffer(req);
+
+    // Upload using Client SDK (uses the config's bucket automatically)
+    await uploadBytes(fileRef, buffer, {
+      contentType: contentType,
     });
 
-    // Store metadata in Firestore using Admin SDK
-    await db.collection('imports').doc(fileId).set({
+    // Store metadata in Firestore
+    await setDoc(doc(db, 'imports', fileId), {
       fileName: filename,
       storagePath: storagePath,
       createdAt: new Date().toISOString()
@@ -64,6 +64,10 @@ export default async function handler(req: any, res: any) {
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ error: 'Upload failed', details: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ 
+      error: 'Upload failed', 
+      details: error instanceof Error ? error.message : String(error),
+      bucketTried: firebaseConfig.storageBucket
+    });
   }
 }
