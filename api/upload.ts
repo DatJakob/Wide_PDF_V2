@@ -27,8 +27,8 @@ export default async function handler(req: any, res: any) {
       contentType: contentType,
     });
 
-    // We use the blob URL as the ID or store the mapping
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://wide-pdf.vercel.app';
+    // Use the preferred custom domain for the generated link
+    const baseUrl = 'https://wide-pdf.vercel.app';
     const encodedId = Buffer.from(blob.url).toString('base64');
     
     res.json({ 
