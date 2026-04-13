@@ -1,7 +1,12 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, getDoc } from 'firebase/firestore';
 import { getStorage, ref, getBytes, getMetadata } from 'firebase/storage';
-import firebaseConfig from '../firebase-applet-config.json';
+import fs from 'fs';
+import path from 'path';
+
+// Load Firebase config manually to avoid ESM import issues
+const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
 // Initialize Firebase Client SDK
 const app = initializeApp(firebaseConfig);
