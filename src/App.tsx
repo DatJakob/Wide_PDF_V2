@@ -18,7 +18,7 @@ interface FileItem {
   selected?: boolean;
 }
 
-// Force refresh v54
+// Force refresh v43
 export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
@@ -114,9 +114,6 @@ export default function App() {
             const filenameMatch = disposition.match(/filename="?([^";]+)"?/);
             if (filenameMatch && filenameMatch[1]) {
               fileName = filenameMatch[1];
-              // Remove Vercel's random suffix if it was added to the filename string itself
-              // Vercel suffix is usually a dash followed by random chars before the extension
-              fileName = fileName.replace(/-[a-zA-Z0-9]{10,}\.pdf$/i, '.pdf');
             }
           }
           

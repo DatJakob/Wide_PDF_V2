@@ -1,16 +1,3 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
-import fs from 'fs';
-import path from 'path';
-
-// Load Firebase config manually
-const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-
-// Initialize Firebase Client SDK
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-
 export default async function handler(req: any, res: any) {
   const id = req.query.id as string;
   
@@ -19,28 +6,32 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Get metadata from Firestore
-    const docRef = doc(db, 'imports', id);
-    const docSnap = await getDoc(docRef);
+    // Decode the URL from the ID (using Buffer for Node.js robustness)
+    const fileUrl = Buffer.from(id, 'base64').toString('utf-8');
     
-    if (!docSnap.exists()) {
-      return res.status(404).json({ error: 'File metadata not found' });
+    // Fetch the private blob using the administrative token
+    const response = await fetch(fileUrl, {
+      headers: {
+        'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Fetch failed with status: ${response.status}`);
+      throw new Error('File not found or access denied');
     }
 
-    const data = docSnap.data();
-    const blobUrl = data?.blobUrl;
+    const buffer = await response.arrayBuffer();
+    const contentType = response.headers.get('content-type') || 'application/pdf';
+    const contentDisposition = response.headers.get('content-disposition');
 
-    if (!blobUrl) {
-      return res.status(404).json({ error: 'Blob URL not found' });
+    res.setHeader('Content-Type', contentType);
+    if (contentDisposition) {
+      res.setHeader('Content-Disposition', contentDisposition);
     }
-
-    // Redirect to the Vercel Blob URL
-    res.redirect(blobUrl);
+    res.send(Buffer.from(buffer));
   } catch (error) {
     console.error('File retrieval error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error', 
-      details: error instanceof Error ? error.message : String(error) 
-    });
+    res.status(404).json({ error: 'File not found or expired' });
   }
 }

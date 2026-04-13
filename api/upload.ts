@@ -1,17 +1,5 @@
 import { put } from '@vercel/blob';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
-import fs from 'fs';
-import path from 'path';
-
-// Load Firebase config manually
-const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-
-// Initialize Firebase Client SDK for metadata
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 export const config = {
   api: {
@@ -25,33 +13,31 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const filename = (req.headers['x-filename'] as string) || 'document.pdf';
+    // Note: In Vercel Serverless, we'd typically use a library like 'formidable' 
+    // to parse multipart/form-data. For this example, we assume the file is sent 
+    // as a raw body or we use a simpler approach.
+    // To keep it robust for Vercel, we'll use the request directly if it's a stream.
+    
+    const filename = req.headers['x-filename'] || 'document.pdf';
     const contentType = req.headers['content-type'] || 'application/pdf';
-    const fileId = uuidv4();
-
-    // Upload to Vercel Blob (Fixing the "already exists" error)
-    const blob = await put(`imports/${fileId}/${filename}`, req, {
-      access: 'public',
+    
+    const blob = await put(filename, req, {
+      access: 'private',
+      addRandomSuffix: true,
       contentType: contentType,
-      addRandomSuffix: true, // This prevents the "already exists" error
     });
 
-    // Store metadata in Firestore
-    await setDoc(doc(db, 'imports', fileId), {
-      fileName: filename,
-      blobUrl: blob.url,
-      createdAt: new Date().toISOString()
-    });
-
+    // Use the preferred custom domain for the generated link
+    const baseUrl = 'https://wide-pdf.vercel.app';
+    const encodedId = Buffer.from(blob.url).toString('base64');
+    
     res.json({ 
-      id: fileId, 
-      url: `https://wide-pdf.vercel.app/import?id=${fileId}`,
+      id: encodedId, 
+      url: `${baseUrl}/import?id=${encodedId}`,
+      expiresIn: 'Depends on Vercel Blob settings'
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ 
-      error: 'Upload failed', 
-      details: error instanceof Error ? error.message : String(error)
-    });
+    res.status(500).json({ error: 'Upload failed' });
   }
 }
