@@ -1,6 +1,4 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc } from 'firebase/firestore';
-import { getStorage, ref, uploadBytes } from 'firebase/storage';
+import admin from 'firebase-admin';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
@@ -9,65 +7,75 @@ import path from 'path';
 const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 
-// Initialize Firebase Client SDK
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-const storage = getStorage(app);
-
 export const config = {
   api: {
     bodyParser: false,
   },
 };
 
-async function streamToBuffer(stream: any): Promise<Buffer> {
-  const chunks = [];
-  for await (const chunk of stream) {
-    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  try {
-    const filename = (req.headers['x-filename'] as string) || 'document.pdf';
-    const contentType = req.headers['content-type'] || 'application/pdf';
-    
-    const fileId = uuidv4();
-    const storagePath = `imports/${fileId}/${filename}`;
-    const fileRef = ref(storage, storagePath);
+  const bucketsToTry = [
+    firebaseConfig.storageBucket,
+    `${firebaseConfig.projectId}.appspot.com`,
+    firebaseConfig.projectId
+  ];
 
-    // Read the stream into a buffer
-    const buffer = await streamToBuffer(req);
+  let lastError = null;
 
-    // Upload using Client SDK (uses the config's bucket automatically)
-    await uploadBytes(fileRef, buffer, {
-      contentType: contentType,
-    });
+  for (const bucketName of bucketsToTry) {
+    try {
+      // Clear existing apps to re-initialize with new bucket if needed
+      if (admin.apps.length) {
+        await Promise.all(admin.apps.map(app => app?.delete()));
+      }
 
-    // Store metadata in Firestore
-    await setDoc(doc(db, 'imports', fileId), {
-      fileName: filename,
-      storagePath: storagePath,
-      createdAt: new Date().toISOString()
-    });
+      admin.initializeApp({
+        projectId: firebaseConfig.projectId,
+        storageBucket: bucketName
+      });
 
-    const baseUrl = 'https://wide-pdf.vercel.app';
-    
-    res.json({ 
-      id: fileId, 
-      url: `${baseUrl}/import?id=${fileId}`,
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ 
-      error: 'Upload failed', 
-      details: error instanceof Error ? error.message : String(error),
-      bucketTried: firebaseConfig.storageBucket
-    });
+      const db = admin.firestore();
+      const bucket = admin.storage().bucket(bucketName);
+
+      const filename = (req.headers['x-filename'] as string) || 'document.pdf';
+      const contentType = req.headers['content-type'] || 'application/pdf';
+      const fileId = uuidv4();
+      const storagePath = `imports/${fileId}/${filename}`;
+      const file = bucket.file(storagePath);
+
+      await new Promise((resolve, reject) => {
+        const stream = file.createWriteStream({
+          metadata: { contentType },
+          resumable: false
+        });
+        req.pipe(stream).on('error', reject).on('finish', resolve);
+      });
+
+      await db.collection('imports').doc(fileId).set({
+        fileName: filename,
+        storagePath: storagePath,
+        createdAt: new Date().toISOString()
+      });
+
+      return res.json({ 
+        id: fileId, 
+        url: `https://wide-pdf.vercel.app/import?id=${fileId}`,
+        bucketUsed: bucketName
+      });
+    } catch (error) {
+      console.error(`Failed with bucket ${bucketName}:`, error);
+      lastError = error;
+      // Continue to next bucket
+    }
   }
+
+  res.status(500).json({ 
+    error: 'Upload failed after trying all buckets', 
+    details: lastError instanceof Error ? lastError.message : String(lastError),
+    bucketsTried: bucketsToTry
+  });
 }
