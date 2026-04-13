@@ -1,0 +1,5 @@
+{
+  "name": "Wide PDF",
+  "description": "Upload a PDF script and generate a new version with space for notes on the right side of each page.",
+  "requestFramePermissions": []
+}

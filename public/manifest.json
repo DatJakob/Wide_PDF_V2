@@ -1,0 +1,18 @@
+{
+  "short_name": "WidePDF",
+  "name": "Wide PDF",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./",
+  "display": "standalone",
+  "theme_color": "#1C1917",
+  "background_color": "#F5F5F4",
+  "orientation": "any",
+  "scope": "./"
+}
