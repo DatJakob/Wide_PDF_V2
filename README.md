@@ -2,19 +2,26 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# Wide PDF
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/59c33362-ea40-46c3-8696-1d869a4d52ef
+Wide PDF erweitert PDF-Seiten rechts um Notizfläche und unterstützt eine temporäre Session-Inbox für Apple-Kurzbefehle.
 
 ## Run Locally
 
 **Prerequisites:**  Node.js
 
-
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Optional: Set `VITE_SESSION_API_BASE_URL` in `.env.local`, wenn die Inbox gegen einen Cloudflare Worker laufen soll.
 3. Run the app:
    `npm run dev`
+
+## Inbox Backend
+
+Der Inbox-Upload läuft über einen Cloudflare Worker im Ordner `worker/`.
+
+1. `cd worker`
+2. `npm install`
+3. In `wrangler.toml` die KV Namespace IDs einsetzen
+4. `cp .dev.vars.example .dev.vars` und Werte ausfüllen
+5. `npm run dev` oder `npm run deploy`

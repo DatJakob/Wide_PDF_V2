@@ -1,0 +1,8 @@
+name = "wide-pdf-inbox"
+main = "src/index.ts"
+compatibility_date = "2026-04-14"
+
+[[kv_namespaces]]
+binding = "INBOX_KV"
+id = "7b1fe53aa9a441b989b5749cec342a27"
+preview_id = "859daeaf491442638861a970155ddf64"

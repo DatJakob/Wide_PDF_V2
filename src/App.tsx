@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback } from 'react';
-import { PDFDocument, rgb, degrees } from 'pdf-lib';
-import { Upload, FileText, Download, Loader2, CheckCircle2, AlertCircle, Trash2, Smartphone, Info, QrCode, Share2, Circle, Check, CheckCircle, Moon, Sun } from 'lucide-react';
+import React, { useState, useCallback, useRef } from 'react';
+import { PDFDocument, rgb } from 'pdf-lib';
+import { Upload, FileText, Download, Loader2, CheckCircle2, AlertCircle, Trash2, Smartphone, Info, Share2, Check, Moon, Sun, Inbox, RefreshCcw, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -16,7 +16,55 @@ interface FileItem {
   downloadUrl?: string;
   error?: string;
   selected?: boolean;
+  remoteFileId?: string;
+  sourceSessionId?: string;
 }
+
+interface SessionFileResponse {
+  fileId: string;
+  fileName: string;
+  downloadUrl: string;
+  createdAt: string;
+  size: number;
+}
+
+interface SessionFilesResponse {
+  sessionId: string;
+  expiresAt: string | null;
+  isExpired: boolean;
+  fileCount: number;
+  files: SessionFileResponse[];
+}
+
+const SESSION_API_BASE_URL = (
+  (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_SESSION_API_BASE_URL || ''
+).replace(/\/$/, '');
+
+const buildSessionApiUrl = (path: string) => {
+  if (!SESSION_API_BASE_URL) {
+    return `/api${path}`;
+  }
+
+  return `${SESSION_API_BASE_URL}${path}`;
+};
+
+const formatSessionExpiry = (isoValue: string | null) => {
+  if (!isoValue) {
+    return 'unbekannt';
+  }
+
+  const parsed = new Date(isoValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'unbekannt';
+  }
+
+  return parsed.toLocaleString('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
 
 // Force refresh v43
 export default function App() {
@@ -24,6 +72,10 @@ export default function App() {
   const [isProcessingAll, setIsProcessingAll] = useState(false);
   const [showInstallInfo, setShowInstallInfo] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [isInboxLoading, setIsInboxLoading] = useState(false);
+  const [isClearingInbox, setIsClearingInbox] = useState(false);
+  const [sessionInfo, setSessionInfo] = useState<{ sessionId: string; expiresAt: string | null; isExpired: boolean; fileCount: number } | null>(null);
+  const loadedRemoteFileIds = useRef<Set<string>>(new Set());
   
   const [noteStyle, setNoteStyle] = useState<'plain' | 'lines' | 'dotted'>(() => {
     const saved = localStorage.getItem('wide-pdf-style');
@@ -74,15 +126,18 @@ export default function App() {
   }, [isDarkMode]);
 
   const appUrl = 'https://wide-pdf.vercel.app';
+  const sessionId = new URLSearchParams(window.location.search).get('session');
 
-  const addFilesToProcess = useCallback((newFiles: File[]) => {
+  const addFilesToProcess = useCallback((newFiles: File[], remoteMetadata?: Array<{ remoteFileId?: string; sourceSessionId?: string }>) => {
     const pdfFiles = newFiles.filter(f => f.type === 'application/pdf');
     
     if (pdfFiles.length > 0) {
-      const newFileItems: FileItem[] = pdfFiles.map(f => ({
+      const newFileItems: FileItem[] = pdfFiles.map((f, index) => ({
         id: Math.random().toString(36).substring(7),
         file: f,
-        status: 'pending'
+        status: 'pending',
+        remoteFileId: remoteMetadata?.[index]?.remoteFileId,
+        sourceSessionId: remoteMetadata?.[index]?.sourceSessionId,
       }));
       setFiles(prev => [...prev, ...newFileItems]);
       generateAll(noteStyle, spacing, widthMultiplier, newFileItems);
@@ -132,6 +187,107 @@ export default function App() {
       fetchFile();
     }
   }, [addFilesToProcess]);
+
+  const hydrateSessionInbox = useCallback(async () => {
+    if (!sessionId) {
+      return;
+    }
+
+    setIsInboxLoading(true);
+
+    try {
+      const response = await fetch(buildSessionApiUrl(`/session-files?sessionId=${encodeURIComponent(sessionId)}`));
+      const payload = await response.json() as SessionFilesResponse & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || 'Inbox konnte nicht geladen werden.');
+      }
+
+      setSessionInfo({
+        sessionId: payload.sessionId,
+        expiresAt: payload.expiresAt,
+        isExpired: payload.isExpired,
+        fileCount: payload.fileCount,
+      });
+
+      if (payload.isExpired) {
+        setImportError('Diese Inbox ist abgelaufen. Neue PDFs starten wieder eine frische Session.');
+        return;
+      }
+
+      const newRemoteFiles = payload.files.filter(file => !loadedRemoteFileIds.current.has(file.fileId));
+      if (newRemoteFiles.length === 0) {
+        return;
+      }
+
+      const importedFiles: File[] = [];
+      const metadata: Array<{ remoteFileId?: string; sourceSessionId?: string }> = [];
+
+      for (const remoteFile of newRemoteFiles) {
+        const fileResponse = await fetch(remoteFile.downloadUrl);
+        if (!fileResponse.ok) {
+          throw new Error(`Datei "${remoteFile.fileName}" konnte nicht geladen werden.`);
+        }
+
+        const blob = await fileResponse.blob();
+        importedFiles.push(new File([blob], remoteFile.fileName, { type: 'application/pdf' }));
+        metadata.push({ remoteFileId: remoteFile.fileId, sourceSessionId: sessionId });
+        loadedRemoteFileIds.current.add(remoteFile.fileId);
+      }
+
+      addFilesToProcess(importedFiles, metadata);
+    } catch (err) {
+      console.error('Session import failed:', err);
+      setImportError(err instanceof Error ? err.message : 'Inbox-Import fehlgeschlagen');
+    } finally {
+      setIsInboxLoading(false);
+    }
+  }, [addFilesToProcess, sessionId]);
+
+  React.useEffect(() => {
+    hydrateSessionInbox();
+  }, [hydrateSessionInbox]);
+
+  const clearInbox = useCallback(async () => {
+    if (!sessionId) {
+      return;
+    }
+
+    setIsClearingInbox(true);
+
+    try {
+      const response = await fetch(buildSessionApiUrl('/clear-session'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ sessionId }),
+      });
+      const payload = await response.json() as { ok?: boolean; error?: string };
+
+      if (!response.ok || !payload.ok) {
+        throw new Error(payload.error || 'Inbox konnte nicht geleert werden.');
+      }
+
+      setFiles(prev => {
+        prev.forEach(file => {
+          if (file.sourceSessionId === sessionId && file.downloadUrl) {
+            URL.revokeObjectURL(file.downloadUrl);
+          }
+        });
+
+        return prev.filter(file => file.sourceSessionId !== sessionId);
+      });
+
+      loadedRemoteFileIds.current.clear();
+      setSessionInfo(prev => prev ? { ...prev, fileCount: 0 } : prev);
+    } catch (err) {
+      console.error('Clear inbox failed:', err);
+      setImportError(err instanceof Error ? err.message : 'Inbox konnte nicht geleert werden');
+    } finally {
+      setIsClearingInbox(false);
+    }
+  }, [sessionId]);
 
   const processFile = async (fileItem: FileItem, style: 'plain' | 'lines' | 'dotted', currentSpacing: number, currentMultiplier: number) => {
     setFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'processing', error: undefined } : f));
@@ -305,6 +461,51 @@ export default function App() {
           </header>
 
           <div className="space-y-8">
+            {sessionInfo && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-stone-50 dark:bg-stone-950/50 border border-stone-200 dark:border-stone-800 rounded-2xl p-5"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-10 h-10 rounded-2xl bg-stone-900 dark:bg-white text-white dark:text-stone-900 flex items-center justify-center shrink-0">
+                      <Inbox size={18} />
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-sm font-bold uppercase tracking-wider text-stone-900 dark:text-white">Session Inbox</h2>
+                        {isInboxLoading && <Loader2 className="animate-spin text-stone-400" size={14} />}
+                      </div>
+                      <p className="text-sm text-stone-600 dark:text-stone-400">
+                        {sessionInfo.isExpired ? 'Diese Session ist abgelaufen.' : `${Math.max(sessionInfo.fileCount, files.filter(file => file.sourceSessionId === sessionId).length)} PDFs in der Inbox`}
+                      </p>
+                      <p className="text-xs text-stone-500 dark:text-stone-500">Läuft bis {formatSessionExpiry(sessionInfo.expiresAt)}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => hydrateSessionInbox()}
+                      disabled={isInboxLoading}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-stone-200 dark:border-stone-700 text-xs font-semibold text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800 disabled:opacity-50"
+                    >
+                      <RefreshCcw size={14} />
+                      Aktualisieren
+                    </button>
+                    <button
+                      onClick={() => clearInbox()}
+                      disabled={isClearingInbox}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-red-200 dark:border-red-900/50 text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                    >
+                      {isClearingInbox ? <Loader2 className="animate-spin" size={14} /> : <X size={14} />}
+                      Inbox leeren
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {importError && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -487,7 +688,10 @@ export default function App() {
                           </div>
                           <div className="overflow-hidden">
                             <p className="font-semibold text-stone-900 dark:text-white truncate text-sm">{fileItem.file.name}</p>
-                            <p className="text-stone-400 dark:text-stone-500 text-xs">{(fileItem.file.size / 1024 / 1024).toFixed(2)} MB • {fileItem.status}</p>
+                            <p className="text-stone-400 dark:text-stone-500 text-xs">
+                              {(fileItem.file.size / 1024 / 1024).toFixed(2)} MB • {fileItem.status}
+                              {fileItem.sourceSessionId ? ' • Inbox' : ''}
+                            </p>
                           </div>
                         </div>
                         
