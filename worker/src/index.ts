@@ -154,7 +154,7 @@ export default {
       return createJsonResponse({
         sessionId,
         fileId,
-        openUrl: `${(env.APP_URL || 'https://wide-pdf.vercel.app').replace(/\/$/, '')}/?session=${encodeURIComponent(sessionId)}`,
+        openUrl: `${(env.APP_URL || 'https://wide-pdf-v2.vercel.app').replace(/\/$/, '')}/?session=${encodeURIComponent(sessionId)}`,
         expiresAt,
       });
     }

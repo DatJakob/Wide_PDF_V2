@@ -28,7 +28,7 @@ export default async function handler(req: any, res: any) {
     });
 
     // Use the preferred custom domain for the generated link
-    const baseUrl = 'https://wide-pdf.vercel.app';
+    const baseUrl = 'https://wide-pdf-v2.vercel.app';
     const encodedId = Buffer.from(blob.url).toString('base64');
     
     res.json({ 

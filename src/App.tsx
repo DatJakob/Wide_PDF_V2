@@ -129,7 +129,7 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  const appUrl = 'https://wide-pdf.vercel.app';
+  const appUrl = 'https://wide-pdf-v2.vercel.app';
   const sessionId = new URLSearchParams(window.location.search).get('session');
 
   const copyShortcutUrl = async () => {
