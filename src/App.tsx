@@ -71,11 +71,13 @@ export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
   const [showInstallInfo, setShowInstallInfo] = useState(false);
+  const [showShortcutInfo, setShowShortcutInfo] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [isInboxLoading, setIsInboxLoading] = useState(false);
   const [isClearingInbox, setIsClearingInbox] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<{ sessionId: string; expiresAt: string | null; isExpired: boolean; fileCount: number } | null>(null);
   const loadedRemoteFileIds = useRef<Set<string>>(new Set());
+  const [showShortcutImage, setShowShortcutImage] = useState(true);
   
   const [noteStyle, setNoteStyle] = useState<'plain' | 'lines' | 'dotted'>(() => {
     const saved = localStorage.getItem('wide-pdf-style');
@@ -737,13 +739,22 @@ export default function App() {
         </div>
         
         <footer className="bg-stone-50 dark:bg-stone-950 p-6 border-t border-stone-100 dark:border-stone-800 text-center relative transition-colors duration-200">
-          <button 
-            onClick={() => setShowInstallInfo(!showInstallInfo)}
-            className="inline-flex items-center space-x-2 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors text-sm font-medium"
-          >
-            <Smartphone size={16} />
-            <span>Als App nutzen</span>
-          </button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button 
+              onClick={() => setShowInstallInfo(!showInstallInfo)}
+              className="inline-flex items-center justify-center space-x-2 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors text-sm font-medium border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 rounded-full px-4 py-2 min-w-44"
+            >
+              <Smartphone size={16} />
+              <span>Als App nutzen</span>
+            </button>
+            <button 
+              onClick={() => setShowShortcutInfo(!showShortcutInfo)}
+              className="inline-flex items-center justify-center space-x-2 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white transition-colors text-sm font-medium border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 rounded-full px-4 py-2 min-w-44"
+            >
+              <Share2 size={16} />
+              <span>Apple Kurzbefehl</span>
+            </button>
+          </div>
 
           <AnimatePresence>
             {showInstallInfo && (
@@ -773,6 +784,56 @@ export default function App() {
                       <li>Wähle <b>"Zum Home-Bildschirm"</b> aus.</li>
                       <li>Als <b>Web-App</b> öffnen und auf <b>"Hinzufügen"</b> tippen.</li>
                     </ol>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {showShortcutInfo && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mt-6 text-left bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-6 text-sm text-stone-600 dark:text-stone-400 overflow-hidden"
+              >
+                <div className="space-y-5">
+                  <div className="flex items-center space-x-2 text-stone-900 dark:text-white font-bold">
+                    <Share2 size={18} />
+                    <span>Apple-Kurzbefehl einrichten</span>
+                  </div>
+
+                  <ol className="list-decimal list-inside space-y-2 ml-1">
+                    <li>Öffne auf dem iPad die App <b>Kurzbefehle</b> und erstelle einen neuen Kurzbefehl.</li>
+                    <li>Aktiviere in den Details <b>"Im Teilen-Menü anzeigen"</b> und erlaube <b>Dateien</b> als Eingabe.</li>
+                    <li>Füge die Aktion <b>"Inhalt von URL abrufen"</b> mit <b>POST</b> auf deinen Cloudflare-Worker hinzu.</li>
+                    <li>Setze die Header <b>x-session-id</b>, <b>x-shortcut-token</b> und <b>x-filename</b>.</li>
+                    <li>Nutze als Body die geteilte PDF-Datei und lies danach aus der JSON-Antwort den Wert <b>openUrl</b> aus.</li>
+                    <li>Zeige anschließend eine Auswahl wie <b>"Wide PDF öffnen"</b> an und öffne erst dann die URL.</li>
+                  </ol>
+
+                  <div className="rounded-2xl border border-dashed border-stone-200 dark:border-stone-700 p-4 bg-stone-50 dark:bg-stone-950/50">
+                    <p className="font-semibold text-stone-800 dark:text-stone-200">Bild zum Aufbau prüfen</p>
+                    <p className="mt-1 text-sm">
+                      Lege deinen Screenshot als <span className="font-mono">public/shortcut-setup.png</span> ab.
+                      PNG ist perfekt, du musst nichts umwandeln. Sobald die Datei dort liegt, erscheint sie hier automatisch.
+                    </p>
+
+                    {showShortcutImage && (
+                      <img
+                        src="/shortcut-setup.png"
+                        alt="Apple-Kurzbefehl Aufbau"
+                        className="mt-4 w-full rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900"
+                        onError={() => setShowShortcutImage(false)}
+                      />
+                    )}
+
+                    {!showShortcutImage && (
+                      <p className="mt-4 text-xs text-stone-500 dark:text-stone-500">
+                        Noch kein Screenshot gefunden. Dateiname: <span className="font-mono">public/shortcut-setup.png</span>
+                      </p>
+                    )}
                   </div>
                 </div>
               </motion.div>
