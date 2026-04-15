@@ -804,33 +804,70 @@ export default function App() {
                     <span>Apple-Kurzbefehl einrichten</span>
                   </div>
 
-                  <ol className="list-decimal list-inside space-y-2 ml-1">
-                    <li>Öffne auf dem iPad die App <b>Kurzbefehle</b> und erstelle einen neuen Kurzbefehl.</li>
-                    <li>Aktiviere in den Details <b>"Im Teilen-Menü anzeigen"</b> und erlaube <b>Dateien</b> als Eingabe.</li>
-                    <li>Füge die Aktion <b>"Inhalt von URL abrufen"</b> mit <b>POST</b> auf deinen Cloudflare-Worker hinzu.</li>
-                    <li>Setze die Header <b>x-session-id</b>, <b>x-shortcut-token</b> und <b>x-filename</b>.</li>
-                    <li>Nutze als Body die geteilte PDF-Datei und lies danach aus der JSON-Antwort den Wert <b>openUrl</b> aus.</li>
-                    <li>Zeige anschließend eine Auswahl wie <b>"Wide PDF öffnen"</b> an und öffne erst dann die URL.</li>
+                  <ol className="list-decimal space-y-4 ml-5">
+                    <li>
+                      <span className="font-semibold text-stone-800 dark:text-stone-200">Neuen Kurzbefehl anlegen</span>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p>- Aktion: neuer Kurzbefehl in <b>Kurzbefehle</b></p>
+                        <p>- Details öffnen und <b>"Im Teilen-Menü anzeigen"</b> aktivieren</p>
+                        <p>- Als Eingabe <b>Dateien</b> erlauben</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Name abrufen"</span>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p>- Eingabe: <b>Kurzbefehleingabe</b></p>
+                        <p>- Diese Aktion liefert den Dateinamen für <b>x-filename</b></p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "URL"</span>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p>- Inhalt: <span className="font-mono break-all">https://wide-pdf-inbox.hans-l0lmail.workers.dev/session-upload</span></p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Inhalt von URL abrufen"</span>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p>- Methode: <b>POST</b></p>
+                        <p>- Header 1: <b>x-session-id</b> mit deiner festen Inbox-ID</p>
+                        <p>- Header 2: <b>x-shortcut-token</b> mit deinem geheimen Token</p>
+                        <p>- Header 3: <b>x-filename</b> mit dem Ergebnis aus <b>Name abrufen</b></p>
+                        <p>- Body: die geteilte PDF-Datei aus der <b>Kurzbefehleingabe</b></p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Wörterbuchwert abrufen"</span>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p>- Eingabe: Ergebnis von <b>Inhalt von URL abrufen</b></p>
+                        <p>- Typ: <b>Wert</b></p>
+                        <p>- Schlüssel: <span className="font-mono">openUrl</span></p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Aus Menü auswählen"</span>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p>- Titel: <b>Wide PDF öffnen</b></p>
+                        <p>- Option 1: <b>Öffnen</b></p>
+                        <p>- Option 2: <b>Abbrechen</b></p>
+                        <p>- Unter <b>Öffnen</b>: Aktion <b>URLs öffnen</b> mit dem Wert aus <b>openUrl</b></p>
+                        <p>- Unter <b>Abbrechen</b>: Aktion <b>Kurzbefehl stoppen</b></p>
+                      </div>
+                    </li>
                   </ol>
 
                   <div className="rounded-2xl border border-dashed border-stone-200 dark:border-stone-700 p-4 bg-stone-50 dark:bg-stone-950/50">
-                    <p className="font-semibold text-stone-800 dark:text-stone-200">Bild zum Aufbau prüfen</p>
-                    <p className="mt-1 text-sm">
-                      Lege deinen Screenshot als <span className="font-mono">public/shortcut-setup.png</span> ab.
-                      PNG ist perfekt, du musst nichts umwandeln. Sobald die Datei dort liegt, erscheint sie hier automatisch.
-                    </p>
-
                     {showShortcutImage && (
                       <img
                         src="/shortcut-setup.png"
                         alt="Apple-Kurzbefehl Aufbau"
-                        className="mt-4 w-full rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900"
+                        className="w-full rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900"
                         onError={() => setShowShortcutImage(false)}
                       />
                     )}
 
                     {!showShortcutImage && (
-                      <p className="mt-4 text-xs text-stone-500 dark:text-stone-500">
+                      <p className="text-xs text-stone-500 dark:text-stone-500">
                         Noch kein Screenshot gefunden. Dateiname: <span className="font-mono">public/shortcut-setup.png</span>
                       </p>
                     )}
