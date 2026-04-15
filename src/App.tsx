@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useRef } from 'react';
 import { PDFDocument, rgb } from 'pdf-lib';
-import { Upload, FileText, Download, Loader2, CheckCircle2, AlertCircle, Trash2, Smartphone, Info, Share2, Check, Moon, Sun, Inbox, RefreshCcw, X } from 'lucide-react';
+import { Upload, FileText, Download, Loader2, CheckCircle2, AlertCircle, Trash2, Smartphone, Info, Share2, Check, Moon, Sun, Inbox, RefreshCcw, X, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -65,6 +65,8 @@ const formatSessionExpiry = (isoValue: string | null) => {
     minute: '2-digit',
   });
 };
+
+const SHORTCUT_UPLOAD_URL = 'https://wide-pdf-inbox.hans-l0lmail.workers.dev/session-upload';
 
 // Force refresh v43
 export default function App() {
@@ -129,6 +131,16 @@ export default function App() {
 
   const appUrl = 'https://wide-pdf.vercel.app';
   const sessionId = new URLSearchParams(window.location.search).get('session');
+
+  const copyShortcutUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(SHORTCUT_UPLOAD_URL);
+      alert('Upload-URL kopiert');
+    } catch (error) {
+      console.error('Copy failed:', error);
+      alert('Kopieren fehlgeschlagen.');
+    }
+  };
 
   const addFilesToProcess = useCallback((newFiles: File[], remoteMetadata?: Array<{ remoteFileId?: string; sourceSessionId?: string }>) => {
     const pdfFiles = newFiles.filter(f => f.type === 'application/pdf');
@@ -809,49 +821,65 @@ export default function App() {
                       <span className="font-semibold text-stone-800 dark:text-stone-200">Neuen Kurzbefehl anlegen</span>
                       <div className="mt-2 space-y-1 text-sm">
                         <p>- Aktion: neuer Kurzbefehl in <b>Kurzbefehle</b></p>
-                        <p>- Details öffnen und <b>"Im Teilen-Menü anzeigen"</b> aktivieren</p>
-                        <p>- Als Eingabe <b>Dateien</b> erlauben</p>
+                        <p>- Rechts oben auf <b>i</b> tippen und <b>"Im Share-Sheet anzeigen"</b> aktivieren</p>
+                        <p>- Als Eingang nur <b>PDFs</b> auswählen</p>
                       </div>
                     </li>
                     <li>
                       <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Name abrufen"</span>
                       <div className="mt-2 space-y-1 text-sm">
-                        <p>- Eingabe: <b>Kurzbefehleingabe</b></p>
+                        <p>- Namen abrufen von <b>Kurzbefehleingabe</b></p>
                         <p>- Diese Aktion liefert den Dateinamen für <b>x-filename</b></p>
                       </div>
                     </li>
                     <li>
                       <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "URL"</span>
                       <div className="mt-2 space-y-1 text-sm">
-                        <p>- Inhalt: <span className="font-mono break-all">https://wide-pdf-inbox.hans-l0lmail.workers.dev/session-upload</span></p>
+                        <div className="flex items-start gap-2">
+                          <p className="flex-1">- Inhalt: <span className="font-mono break-all">{SHORTCUT_UPLOAD_URL}</span></p>
+                          <button
+                            onClick={() => void copyShortcutUrl()}
+                            className="shrink-0 inline-flex items-center justify-center rounded-lg border border-stone-200 dark:border-stone-700 p-2 text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
+                            aria-label="Upload-URL kopieren"
+                            title="Upload-URL kopieren"
+                          >
+                            <Copy size={14} />
+                          </button>
+                        </div>
                       </div>
                     </li>
                     <li>
                       <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Inhalt von URL abrufen"</span>
                       <div className="mt-2 space-y-1 text-sm">
                         <p>- Methode: <b>POST</b></p>
-                        <p>- Header 1: <b>x-session-id</b> mit deiner festen Inbox-ID</p>
-                        <p>- Header 2: <b>x-shortcut-token</b> mit deinem geheimen Token</p>
-                        <p>- Header 3: <b>x-filename</b> mit dem Ergebnis aus <b>Name abrufen</b></p>
-                        <p>- Body: die geteilte PDF-Datei aus der <b>Kurzbefehleingabe</b></p>
+                        <p>- Die Header <b>x-...</b> sind die Schlüssel, der Text daneben ist der Wert</p>
+                        <p>- <b>x-session-id</b>: frei wählbar für jeden Nutzer, damit jede Person ein eigenes Postfach hat, z. B. <span className="font-mono">jakob-inbox</span></p>
+                        <p>- <b>x-shortcut-token</b>: dein geheimes Token</p>
+                        <p>- <b>x-filename</b>: unten über der Tastatur <b>Variable auswählen</b> und <b>Name</b> aus <b>Name abrufen</b> einsetzen</p>
+                        <p>- Haupttext anfordern: <b>Datei</b></p>
+                        <p>- Datei: <b>Kurzbefehleingang</b></p>
                       </div>
                     </li>
                     <li>
                       <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Wörterbuchwert abrufen"</span>
                       <div className="mt-2 space-y-1 text-sm">
-                        <p>- Eingabe: Ergebnis von <b>Inhalt von URL abrufen</b></p>
-                        <p>- Typ: <b>Wert</b></p>
-                        <p>- Schlüssel: <span className="font-mono">openUrl</span></p>
+                        <p>- Vorne <b>Wert</b> auswählen</p>
+                        <p>- Dann <span className="font-mono">openUrl</span> eintippen</p>
+                        <p>- Hinten <b>Inhalt von URL</b> auswählen</p>
                       </div>
                     </li>
                     <li>
-                      <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Aus Menü auswählen"</span>
+                      <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "Hinweis anzeigen"</span>
                       <div className="mt-2 space-y-1 text-sm">
-                        <p>- Titel: <b>Wide PDF öffnen</b></p>
-                        <p>- Option 1: <b>Öffnen</b></p>
-                        <p>- Option 2: <b>Abbrechen</b></p>
-                        <p>- Unter <b>Öffnen</b>: Aktion <b>URLs öffnen</b> mit dem Wert aus <b>openUrl</b></p>
-                        <p>- Unter <b>Abbrechen</b>: Aktion <b>Kurzbefehl stoppen</b></p>
+                        <p>- Text: <b>Wide PDF öffnen</b></p>
+                        <p>- Keinen Titel setzen</p>
+                        <p>- <b>Abbrechen</b>-Button aktivieren</p>
+                      </div>
+                    </li>
+                    <li>
+                      <span className="font-semibold text-stone-800 dark:text-stone-200">Aktion "URLs öffnen"</span>
+                      <div className="mt-2 space-y-1 text-sm">
+                        <p>- Als Variable <b>Wörterbuchwert</b> auswählen</p>
                       </div>
                     </li>
                   </ol>
