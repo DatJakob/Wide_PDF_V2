@@ -822,7 +822,7 @@ export default function App() {
                       Beim Nutzen des Kurzbefehls wird Internet benötigt, weil die PDF zuerst temporär zu Cloudflare hochgeladen wird.
                     </p>
                     <p className="text-sm text-amber-800 dark:text-amber-300">
-                      Der Kurzbefehl funktioniert derzeit nicht zuverlässig mit Safari. Nutze dafür bitte die Dateien-App oder einen anderen Browser, z. B. Chrome.
+                      Die PDF, die du an den Kurzbefehl senden willst, darf nicht in Safari geöffnet sein. Starte den Kurzbefehl stattdessen aus der Dateien-App oder aus einem externen Browser, z. B. Chrome. Die anschließende Web-App-Session kann dann aber in Safari geöffnet werden.
                     </p>
                   </div>
 
@@ -864,6 +864,7 @@ export default function App() {
                         <p>- Methode: <b>POST</b></p>
                         <p>- Die Header <b>x-...</b> sind die Schlüssel, der Text daneben ist der Wert</p>
                         <p>- <b>x-session-id</b>: frei wählbar für jeden Nutzer, damit jede Person ein eigenes Postfach hat, z. B. <span className="font-mono">jakob-inbox</span></p>
+                        <p>- Die Web-App-Session erreichst du dann mit diesem Link: <span className="font-mono break-all">http://wide-pdf-v2.vercel.app/?session=(TEXT VON HEADER x-session-id)</span></p>
                         <p>- <b>x-shortcut-token</b>: dein geheimes Token</p>
                         <p>- <b>x-filename</b>: unten über der Tastatur <b>Variable auswählen</b> und <b>Name</b> aus <b>Name abrufen</b> einsetzen</p>
                         <p>- Haupttext anfordern: <b>Datei</b></p>
