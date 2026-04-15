@@ -68,7 +68,6 @@ const formatSessionExpiry = (isoValue: string | null) => {
 
 const SHORTCUT_UPLOAD_URL = 'https://wide-pdf-inbox.hans-l0lmail.workers.dev/session-upload';
 
-// Force refresh v43
 export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isProcessingAll, setIsProcessingAll] = useState(false);
@@ -162,45 +161,6 @@ export default function App() {
     const selectedFiles = Array.from(e.target.files || []) as File[];
     addFilesToProcess(selectedFiles);
   };
-
-  // Handle URL Import
-  React.useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const importId = params.get('id');
-
-    if (importId) {
-      const fetchFile = async () => {
-        try {
-          const response = await fetch(`/api/file?id=${importId}`);
-          if (!response.ok) throw new Error('Datei konnte nicht geladen werden oder ist abgelaufen.');
-          
-          const blob = await response.blob();
-          
-          // Extract filename from Content-Disposition header
-          let fileName = 'imported.pdf';
-          const disposition = response.headers.get('Content-Disposition');
-          if (disposition && disposition.includes('filename=')) {
-            const filenameMatch = disposition.match(/filename="?([^";]+)"?/);
-            if (filenameMatch && filenameMatch[1]) {
-              fileName = filenameMatch[1];
-            }
-          }
-          
-          const file = new File([blob], fileName, { type: 'application/pdf' });
-          
-          addFilesToProcess([file]);
-          
-          // Remove ID from URL
-          const newUrl = window.location.pathname;
-          window.history.replaceState({}, '', newUrl);
-        } catch (err) {
-          console.error('Import failed:', err);
-          setImportError(err instanceof Error ? err.message : 'Import fehlgeschlagen');
-        }
-      };
-      fetchFile();
-    }
-  }, [addFilesToProcess]);
 
   const hydrateSessionInbox = useCallback(async () => {
     if (!sessionId) {

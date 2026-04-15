@@ -9,8 +9,3 @@ coverage/
 .wrangler/
 worker/node_modules/
 worker/.dev.vars
-functions/
-.wrangler/
-worker/node_modules/
-worker/.dev.vars
-functions/
