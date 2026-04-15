@@ -816,6 +816,16 @@ export default function App() {
                     <span>Apple-Kurzbefehl einrichten</span>
                   </div>
 
+                  <div className="rounded-2xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-900/10 p-4 space-y-2">
+                    <p className="font-semibold text-amber-900 dark:text-amber-200">Wichtig vor dem Einrichten</p>
+                    <p className="text-sm text-amber-800 dark:text-amber-300">
+                      Beim Nutzen des Kurzbefehls wird Internet benötigt, weil die PDF zuerst temporär zu Cloudflare hochgeladen wird.
+                    </p>
+                    <p className="text-sm text-amber-800 dark:text-amber-300">
+                      Der Kurzbefehl funktioniert derzeit nicht zuverlässig mit Safari. Nutze dafür bitte die Dateien-App oder einen anderen Browser, z. B. Chrome.
+                    </p>
+                  </div>
+
                   <ol className="list-decimal space-y-4 ml-5">
                     <li>
                       <span className="font-semibold text-stone-800 dark:text-stone-200">Neuen Kurzbefehl anlegen</span>
