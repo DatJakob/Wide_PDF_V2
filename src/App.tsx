@@ -329,7 +329,7 @@ export default function App() {
       const blob = new Blob([pdfBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       
-      setFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'completed', downloadUrl: url } : f));
+      setFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'completed', downloadUrl: url, selected: f.selected ?? true } : f));
     } catch (err) {
       console.error(err);
       setFiles(prev => prev.map(f => f.id === fileItem.id ? { ...f, status: 'error', error: 'Fehler bei der Verarbeitung' } : f));
@@ -784,6 +784,9 @@ export default function App() {
                     <p className="text-sm text-amber-800 dark:text-amber-300">
                       Die PDF, die du an den Kurzbefehl senden willst, darf nicht in Safari geöffnet sein. Starte den Kurzbefehl stattdessen aus der Dateien-App oder aus einem externen Browser, z. B. Chrome. Die anschließende Web-App-Session kann dann aber in Safari geöffnet werden.
                     </p>
+                    <p className="text-sm text-amber-800 dark:text-amber-300">
+                      Die Web-App-Session erreichst du dann mit diesem Link: <span className="font-mono break-all">http://wide-pdf-v2.vercel.app/?session=(TEXT VON HEADER x-session-id)</span>
+                    </p>
                   </div>
 
                   <ol className="list-decimal space-y-4 ml-5">
@@ -824,7 +827,6 @@ export default function App() {
                         <p>- Methode: <b>POST</b></p>
                         <p>- Die Header <b>x-...</b> sind die Schlüssel, der Text daneben ist der Wert</p>
                         <p>- <b>x-session-id</b>: frei wählbar für jeden Nutzer, damit jede Person ein eigenes Postfach hat, z. B. <span className="font-mono">jakob-inbox</span></p>
-                        <p>- Die Web-App-Session erreichst du dann mit diesem Link: <span className="font-mono break-all">http://wide-pdf-v2.vercel.app/?session=(TEXT VON HEADER x-session-id)</span></p>
                         <p>- <b>x-shortcut-token</b>: dein geheimes Token</p>
                         <p>- <b>x-filename</b>: unten über der Tastatur <b>Variable auswählen</b> und <b>Name</b> aus <b>Name abrufen</b> einsetzen</p>
                         <p>- Haupttext anfordern: <b>Datei</b></p>
