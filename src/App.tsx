@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, degrees, rgb } from 'pdf-lib';
 import { Upload, FileText, Download, Loader2, CheckCircle2, AlertCircle, Trash2, Smartphone, Info, Share2, Check, Moon, Sun, Inbox, RefreshCcw, X, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { QRCodeSVG } from 'qrcode.react';
@@ -67,6 +67,8 @@ const formatSessionExpiry = (isoValue: string | null) => {
 };
 
 const SHORTCUT_UPLOAD_URL = 'https://wide-pdf-inbox.hans-l0lmail.workers.dev/session-upload';
+
+const normalizeRotation = (angle: number) => ((angle % 360) + 360) % 360;
 
 export default function App() {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -271,25 +273,57 @@ export default function App() {
       const srcDoc = await PDFDocument.load(fileArrayBuffer, { ignoreEncryption: true });
       const pdfDoc = await PDFDocument.create();
 
-      const copiedPages = await pdfDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-      
-      for (const page of copiedPages) {
-        const { width: originalWidth, height } = page.getSize();
-        const leftMargin = 25; 
-        const rightNoteWidth = originalWidth * currentMultiplier;
-        const totalWidth = leftMargin + originalWidth + rightNoteWidth;
-        
-        page.setMediaBox(-leftMargin, 0, totalWidth, height);
-        page.setCropBox(-leftMargin, 0, totalWidth, height);
-        
-        pdfDoc.addPage(page);
+      const embeddedPages = await pdfDoc.embedPages(srcDoc.getPages());
 
-        const startX = originalWidth;
-        const endX = originalWidth + rightNoteWidth;
-        const patternMargin = 8; 
+      for (const [index, embeddedPage] of embeddedPages.entries()) {
+        const sourcePage = srcDoc.getPage(index);
+        const { width: sourceWidth, height: sourceHeight } = sourcePage.getSize();
+        const rotation = normalizeRotation(sourcePage.getRotation().angle);
+        const isQuarterTurn = rotation === 90 || rotation === 270;
+        const contentWidth = isQuarterTurn ? sourceHeight : sourceWidth;
+        const contentHeight = isQuarterTurn ? sourceWidth : sourceHeight;
+        const leftMargin = 25;
+        const rightNoteWidth = contentWidth * currentMultiplier;
+        const page = pdfDoc.addPage([leftMargin + contentWidth + rightNoteWidth, contentHeight]);
+        const startX = leftMargin + contentWidth;
+        const endX = startX + rightNoteWidth;
+        const patternMargin = 8;
+
+        if (rotation === 90) {
+          page.drawPage(embeddedPage, {
+            x: leftMargin + sourceHeight,
+            y: 0,
+            width: sourceWidth,
+            height: sourceHeight,
+            rotate: degrees(90),
+          });
+        } else if (rotation === 180) {
+          page.drawPage(embeddedPage, {
+            x: leftMargin + sourceWidth,
+            y: sourceHeight,
+            width: sourceWidth,
+            height: sourceHeight,
+            rotate: degrees(180),
+          });
+        } else if (rotation === 270) {
+          page.drawPage(embeddedPage, {
+            x: leftMargin,
+            y: sourceWidth,
+            width: sourceWidth,
+            height: sourceHeight,
+            rotate: degrees(270),
+          });
+        } else {
+          page.drawPage(embeddedPage, {
+            x: leftMargin,
+            y: 0,
+            width: sourceWidth,
+            height: sourceHeight,
+          });
+        }
 
         if (style === 'lines') {
-          for (let y = height - 25; y > 25; y -= currentSpacing) {
+          for (let y = contentHeight - 25; y > 25; y -= currentSpacing) {
             page.drawLine({
               start: { x: startX + patternMargin, y: y },
               end: { x: endX - patternMargin, y: y },
@@ -298,7 +332,7 @@ export default function App() {
             });
           }
         } else if (style === 'dotted') {
-          for (let y = height - 25; y > 25; y -= currentSpacing) {
+          for (let y = contentHeight - 25; y > 25; y -= currentSpacing) {
             for (let x = startX + patternMargin; x < endX - patternMargin; x += currentSpacing) {
               page.drawCircle({
                 x: x,
@@ -311,15 +345,15 @@ export default function App() {
         }
 
         page.drawLine({
-          start: { x: 0, y: 0 },
-          end: { x: 0, y: height },
+          start: { x: leftMargin, y: 0 },
+          end: { x: leftMargin, y: contentHeight },
           thickness: 1,
           color: rgb(0.7, 0.7, 0.7),
         });
         
         page.drawLine({
-          start: { x: originalWidth, y: 0 },
-          end: { x: originalWidth, y: height },
+          start: { x: startX, y: 0 },
+          end: { x: startX, y: contentHeight },
           thickness: 1,
           color: rgb(0.7, 0.7, 0.7),
         });
