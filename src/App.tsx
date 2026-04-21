@@ -291,11 +291,11 @@ export default function App() {
 
         if (rotation === 90) {
           page.drawPage(embeddedPage, {
-            x: leftMargin + sourceHeight,
-            y: 0,
+            x: leftMargin,
+            y: sourceWidth,
             width: sourceWidth,
             height: sourceHeight,
-            rotate: degrees(90),
+            rotate: degrees(270),
           });
         } else if (rotation === 180) {
           page.drawPage(embeddedPage, {
@@ -307,11 +307,11 @@ export default function App() {
           });
         } else if (rotation === 270) {
           page.drawPage(embeddedPage, {
-            x: leftMargin,
-            y: sourceWidth,
+            x: leftMargin + sourceHeight,
+            y: 0,
             width: sourceWidth,
             height: sourceHeight,
-            rotate: degrees(270),
+            rotate: degrees(90),
           });
         } else {
           page.drawPage(embeddedPage, {
